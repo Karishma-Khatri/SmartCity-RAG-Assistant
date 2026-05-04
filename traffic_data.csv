@@ -1,0 +1,13 @@
+Time,Location,Traffic_Count,Pollution_PM2.5,Weather,Avg_Speed
+08:00,City Center,180,210,Sunny,22
+09:00,City Center,260,280,Sunny,14
+10:00,Market,220,250,Sunny,16
+11:00,Highway,300,230,Cloudy,35
+12:00,Industrial Area,350,310,Cloudy,18
+13:00,Bus Stand,280,290,Sunny,12
+14:00,School Zone,160,170,Sunny,20
+15:00,Residential Area,90,110,Cloudy,32
+16:00,Market,270,300,Sunny,13
+17:00,City Center,390,350,Sunny,9
+18:00,Bus Stand,330,340,Cloudy,10
+19:00,Industrial Area,370,360,Cloudy,15
