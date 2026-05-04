@@ -78,7 +78,7 @@ if len(numeric_cols) >= 2:
 
 documents = []
 
- for_index = df.reset_index()
+for_index = df.reset_index()
 
 for _, row in for_index.iterrows():
     text = "Record details: "
