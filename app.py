@@ -5,10 +5,14 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from io import StringIO
 
-st.set_page_config(page_title="Smart City RAG Assistant", page_icon="🚦", layout="wide")
+st.set_page_config(
+    page_title="AI Data Insight Assistant",
+    page_icon="🤖",
+    layout="wide"
+)
 
-st.title("🚦 AI Smart City Intelligence Assistant")
-st.write("RAG-based assistant for traffic and pollution analysis.")
+st.title("🤖 AI Data Insight Assistant")
+st.write("A RAG-based intelligent assistant for analyzing CSV datasets.")
 
 sample_data = """Time,Location,Traffic_Count,Pollution_PM2.5,Weather,Avg_Speed
 08:00,City Center,180,210,Sunny,22
@@ -25,90 +29,131 @@ sample_data = """Time,Location,Traffic_Count,Pollution_PM2.5,Weather,Avg_Speed
 19:00,Industrial Area,370,360,Cloudy,15
 """
 
-uploaded_file = st.file_uploader("Upload traffic_data.csv or use sample data", type=["csv"])
+uploaded_file = st.file_uploader("Upload any CSV dataset", type=["csv"])
 
-if uploaded_file is not None:
-    if uploaded_file.size == 0:
-        st.warning("Uploaded file is empty. Using sample data instead.")
-        df = pd.read_csv(StringIO(sample_data))
-    else:
-        df = pd.read_csv(uploaded_file)
+if uploaded_file is not None and uploaded_file.size > 0:
+    df = pd.read_csv(uploaded_file)
 else:
-    st.info("No file uploaded. Using sample smart city data.")
+    st.info("No valid file uploaded. Using sample smart city dataset.")
     df = pd.read_csv(StringIO(sample_data))
 
-st.success("Data loaded successfully!")
+st.success("Dataset loaded successfully!")
 
-st.subheader("📊 Dataset")
+st.subheader("📊 Dataset Preview")
 st.dataframe(df)
 
+numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns.tolist()
+categorical_cols = df.select_dtypes(include=["object"]).columns.tolist()
+
 col1, col2, col3 = st.columns(3)
-col1.metric("Total Records", len(df))
-col2.metric("Average Traffic", round(df["Traffic_Count"].mean(), 2))
-col3.metric("Average PM2.5", round(df["Pollution_PM2.5"].mean(), 2))
+col1.metric("Rows", df.shape[0])
+col2.metric("Columns", df.shape[1])
+col3.metric("Numeric Columns", len(numeric_cols))
 
-st.subheader("📈 Traffic Count by Location")
-st.plotly_chart(px.bar(df, x="Location", y="Traffic_Count", color="Location"), use_container_width=True)
+st.subheader("📌 Dataset Summary")
+st.write(df.describe())
 
-st.subheader("🌫️ Pollution Level by Location")
-st.plotly_chart(px.bar(df, x="Location", y="Pollution_PM2.5", color="Location"), use_container_width=True)
+if numeric_cols:
+    st.subheader("📈 Numeric Data Visualization")
+    selected_num = st.selectbox("Select numeric column", numeric_cols)
 
-st.subheader("🔗 Traffic vs Pollution")
-st.plotly_chart(
-    px.scatter(df, x="Traffic_Count", y="Pollution_PM2.5", color="Location", size="Traffic_Count"),
-    use_container_width=True
-)
+    if categorical_cols:
+        selected_cat = st.selectbox("Select category column", categorical_cols)
+        fig = px.bar(df, x=selected_cat, y=selected_num, color=selected_cat)
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        fig = px.line(df, y=selected_num)
+        st.plotly_chart(fig, use_container_width=True)
+
+if len(numeric_cols) >= 2:
+    st.subheader("🔗 Relationship Analysis")
+    x_col = st.selectbox("Select X column", numeric_cols, key="x")
+    y_col = st.selectbox("Select Y column", numeric_cols, key="y")
+
+    fig = px.scatter(df, x=x_col, y=y_col)
+    st.plotly_chart(fig, use_container_width=True)
+
+    corr = df[x_col].corr(df[y_col])
+    st.write(f"Correlation between **{x_col}** and **{y_col}** is **{corr:.2f}**.")
 
 documents = []
-for _, row in df.iterrows():
-    documents.append(
-        f"At {row['Time']} in {row['Location']}, traffic count was {row['Traffic_Count']} vehicles, "
-        f"pollution level was {row['Pollution_PM2.5']} PM2.5, average speed was {row['Avg_Speed']} km/h, "
-        f"and weather was {row['Weather']}."
-    )
+
+ for_index = df.reset_index()
+
+for _, row in for_index.iterrows():
+    text = "Record details: "
+    for col in df.columns:
+        text += f"{col} is {row[col]}, "
+    documents.append(text)
 
 vectorizer = TfidfVectorizer()
 doc_vectors = vectorizer.fit_transform(documents)
 
-st.subheader("🤖 Ask the Smart City Assistant")
-query = st.text_input("Ask a question:")
+st.subheader("🤖 Ask Questions About Your Data")
+query = st.text_input("Example: Which value is highest? Give summary. Find relationship.")
 
 if query:
     query_vector = vectorizer.transform([query])
     similarities = cosine_similarity(query_vector, doc_vectors).flatten()
     top_indices = similarities.argsort()[-3:][::-1]
-    retrieved_data = [documents[i] for i in top_indices]
+    retrieved = [documents[i] for i in top_indices]
 
-    st.subheader("AI Answer")
     q = query.lower()
 
-    if "highest traffic" in q or "most congested" in q:
-        row = df.loc[df["Traffic_Count"].idxmax()]
-        st.write(f"The most congested area is **{row['Location']}** at **{row['Time']}** with **{row['Traffic_Count']} vehicles**.")
+    st.subheader("AI Answer")
 
-    elif "highest pollution" in q or "most polluted" in q:
-        row = df.loc[df["Pollution_PM2.5"].idxmax()]
-        st.write(f"The highest pollution is at **{row['Location']}** at **{row['Time']}** with PM2.5 level **{row['Pollution_PM2.5']}**.")
+    if "summary" in q or "summarize" in q:
+        st.write("This dataset contains the following columns:")
+        st.write(list(df.columns))
 
-    elif "traffic affect pollution" in q or "traffic and pollution" in q or "correlation" in q:
-        corr = df["Traffic_Count"].corr(df["Pollution_PM2.5"])
-        st.write(f"The correlation between traffic and pollution is **{corr:.2f}**, so higher traffic generally increases pollution.")
+        st.write("Numeric column averages:")
+        for col in numeric_cols:
+            st.write(f"- **{col}** average: {df[col].mean():.2f}")
 
-    elif "suggest" in q or "reduce" in q or "solution" in q:
+    elif "highest" in q or "maximum" in q or "max" in q:
+        if numeric_cols:
+            chosen_col = st.selectbox("Select column to find highest value", numeric_cols, key="highest")
+            row = df.loc[df[chosen_col].idxmax()]
+            st.write(f"The highest value of **{chosen_col}** is **{row[chosen_col]}**.")
+            st.write("Complete record:")
+            st.write(row)
+        else:
+            st.write("No numeric column found for highest value analysis.")
+
+    elif "lowest" in q or "minimum" in q or "min" in q:
+        if numeric_cols:
+            chosen_col = st.selectbox("Select column to find lowest value", numeric_cols, key="lowest")
+            row = df.loc[df[chosen_col].idxmin()]
+            st.write(f"The lowest value of **{chosen_col}** is **{row[chosen_col]}**.")
+            st.write("Complete record:")
+            st.write(row)
+        else:
+            st.write("No numeric column found for lowest value analysis.")
+
+    elif "relationship" in q or "correlation" in q or "affect" in q:
+        if len(numeric_cols) >= 2:
+            st.write("Correlation analysis between numeric columns:")
+            corr_matrix = df[numeric_cols].corr()
+            st.dataframe(corr_matrix)
+        else:
+            st.write("At least two numeric columns are needed for relationship analysis.")
+
+    elif "suggest" in q or "recommend" in q or "solution" in q:
         st.write("""
-        Suggestions:
-        1. Improve traffic signal timing.
-        2. Promote public transport.
-        3. Encourage carpooling.
-        4. Restrict heavy vehicles during peak hours.
-        5. Monitor high-pollution zones regularly.
+        Recommendations based on data insights:
+
+        1. Identify high-value or high-risk records.
+        2. Compare numeric trends using correlation.
+        3. Monitor extreme values such as maximum and minimum cases.
+        4. Use visualization to support decision-making.
+        5. Extend this system with real-time data sources.
         """)
 
     else:
-        st.write("Relevant retrieved records:")
-        for item in retrieved_data:
+        st.write("Relevant retrieved records from the dataset:")
+        for item in retrieved:
             st.write(item)
 
     with st.expander("Retrieved RAG Context"):
-        for item in retrieved_data:
+        for item in retrieved:
             st.write(item)
